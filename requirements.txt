@@ -1,0 +1,14 @@
+# Streamlit dashboard
+streamlit>=1.37.0
+
+# Kafka consumer
+kafka-python>=2.0.2
+
+# XML → JSON
+xmltodict>=0.13.0
+
+# Oracle DB (thin mode — no Oracle Client installation required)
+oracledb>=2.3.0
+
+# Data manipulation (already pulled in by streamlit, listed explicitly)
+pandas>=2.0.0
