@@ -78,8 +78,6 @@ ORACLE_CONFIG = {
 # → PATH = "root.header.referenceId"
 REFERENCE_ID_PATH = "root.header.referenceId"
 
-# Dashboard auto-refresh interval in seconds
-REFRESH_INTERVAL_SECONDS = 3
-
 # Maximum log entries kept in memory
+# Increase for longer history, decrease for lower memory usage on high-volume topics
 MAX_LOG_ENTRIES = 500
