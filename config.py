@@ -1,9 +1,36 @@
 # ============================================================
 #  EDIT THIS FILE to match your environment before running
-#  Set ENVIRONMENT to "dev", "qa", "uat", or "prod"
+# ============================================================
+#
+#  The active environment is read from a SYSTEM ENVIRONMENT VARIABLE.
+#  Set the variable on your machine or server before running the app.
+#
+#  Variable name : APP_ENVIRONMENT
+#  Allowed values: dev | qa | uat | prod
+#
+#  How to set it temporarily in PowerShell (current session only):
+#    $env:APP_ENVIRONMENT = "dev"
+#
+#  How to set it permanently on Windows:
+#    [System.Environment]::SetEnvironmentVariable("APP_ENVIRONMENT", "dev", "User")
+#
+#  How to set it in Linux/Mac terminal:
+#    export APP_ENVIRONMENT=dev
+#
+#  If the variable is not set, it defaults to "dev" as a fallback.
 # ============================================================
 
-ENVIRONMENT = "dev"   # ← Change this to switch environments: "dev" | "qa" | "uat" | "prod"
+import os
+
+ENVIRONMENT = os.environ.get("APP_ENVIRONMENT", "dev").lower().strip()
+
+# Validate — fail early with a clear message if an unknown value is set
+_VALID_ENVIRONMENTS = ("dev", "qa", "uat", "prod")
+if ENVIRONMENT not in _VALID_ENVIRONMENTS:
+    raise ValueError(
+        f"Invalid APP_ENVIRONMENT='{ENVIRONMENT}'. "
+        f"Must be one of: {', '.join(_VALID_ENVIRONMENTS)}"
+    )
 
 # ── Environment-specific Kafka broker settings ────────────────────────────────
 #
