@@ -169,27 +169,55 @@ state = ConsumerState()
 # ---------------------------------------------------------------------------
 
 def _build_kafka_consumer() -> KafkaConsumer:
-    kwargs = {
-        "bootstrap_servers": KAFKA_CONFIG["bootstrap_servers"],
-        "group_id": KAFKA_CONFIG["group_id"],
-        "auto_offset_reset": KAFKA_CONFIG["auto_offset_reset"],
-        "value_deserializer": lambda m: m.decode("utf-8", errors="replace"),
-        "consumer_timeout_ms": 1000,      # raises StopIteration when idle → lets us check running flag
-        "security_protocol": KAFKA_CONFIG.get("security_protocol", "PLAINTEXT"),
-    }
-
+    import os
     protocol = KAFKA_CONFIG.get("security_protocol", "PLAINTEXT")
 
-    # SSL / SASL_SSL — pass certificate and key paths
+    kwargs = {
+        "bootstrap_servers": KAFKA_CONFIG["bootstrap_servers"],
+        "group_id":          KAFKA_CONFIG["group_id"],
+        "auto_offset_reset": KAFKA_CONFIG["auto_offset_reset"],
+        "value_deserializer": lambda m: m.decode("utf-8", errors="replace"),
+        "consumer_timeout_ms": 1000,
+        "security_protocol": protocol,
+    }
+
+    # ── SASL_SSL or SASL_PLAINTEXT with Kerberos (GSSAPI) ────────────────────
+    if protocol in ("SASL_SSL", "SASL_PLAINTEXT"):
+        kwargs["sasl_mechanism"] = KAFKA_CONFIG.get("sasl_mechanism", "GSSAPI")
+
+        if kwargs["sasl_mechanism"] == "GSSAPI":
+            # Set Kerberos config file path as environment variable
+            krb5_path = KAFKA_CONFIG.get("krb5_conf_path")
+            if krb5_path:
+                os.environ["KRB5_CONFIG"] = krb5_path
+
+            # Build JAAS config string for Kerberos keytab login
+            keytab   = KAFKA_CONFIG.get("sasl_kerberos_keytab", "")
+            principal = KAFKA_CONFIG.get("sasl_kerberos_principal", "")
+            kwargs["sasl_kerberos_service_name"] = KAFKA_CONFIG.get("sasl_kerberos_service_name", "kafka")
+            kwargs["sasl_jaas_config"] = (
+                f'com.sun.security.auth.module.Krb5LoginModule required '
+                f'useKeyTab=true '
+                f'storeKey=true '
+                f'keyTab="{keytab}" '
+                f'principal="{principal}";'
+            )
+
+        # Plain username/password (PLAIN / SCRAM)
+        for sasl_key in ("sasl_plain_username", "sasl_plain_password"):
+            if sasl_key in KAFKA_CONFIG and KAFKA_CONFIG[sasl_key] is not None:
+                kwargs[sasl_key] = KAFKA_CONFIG[sasl_key]
+
+    # ── SSL truststore (SASL_SSL or plain SSL) ────────────────────────────────
     if protocol in ("SSL", "SASL_SSL"):
-        for ssl_key in ("ssl_cafile", "ssl_certfile", "ssl_keyfile", "ssl_password", "ssl_check_hostname"):
+        if KAFKA_CONFIG.get("ssl_truststore_location"):
+            kwargs["ssl_cafile"]   = KAFKA_CONFIG["ssl_truststore_location"]
+        if KAFKA_CONFIG.get("ssl_truststore_password"):
+            kwargs["ssl_password"] = KAFKA_CONFIG["ssl_truststore_password"]
+        # Optional client cert fields
+        for ssl_key in ("ssl_certfile", "ssl_keyfile", "ssl_check_hostname"):
             if ssl_key in KAFKA_CONFIG and KAFKA_CONFIG[ssl_key] is not None:
                 kwargs[ssl_key] = KAFKA_CONFIG[ssl_key]
-
-    # SASL credentials (used with SASL_PLAINTEXT or SASL_SSL)
-    for sasl_key in ("sasl_mechanism", "sasl_plain_username", "sasl_plain_password"):
-        if sasl_key in KAFKA_CONFIG and KAFKA_CONFIG[sasl_key] is not None:
-            kwargs[sasl_key] = KAFKA_CONFIG[sasl_key]
 
     return KafkaConsumer(KAFKA_CONFIG["topic"], **kwargs)
 
